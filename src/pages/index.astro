@@ -1,0 +1,114 @@
+---
+import { getCollection } from 'astro:content'
+import { TOPICS } from '../../lib/content/note.ts'
+import { loadStream, shortDate } from '../../lib/site/data.ts'
+import { renderText } from '../../lib/site/stream.ts'
+import Base from '../layouts/Base.astro'
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const notes = (await getCollection('notes')).sort((a, b) => a.data.title.localeCompare(b.data.title))
+const beds = TOPICS.map((t) => ({ topic: t, notes: notes.filter((n) => n.data.topics[0] === t) })).filter(
+  (b) => b.notes.length,
+)
+const fallow = TOPICS.filter((t) => !notes.some((n) => n.data.topics.includes(t)))
+
+type Item = {
+  key: string
+  when: string
+  kind: 'stream' | 'note'
+  html?: string
+  photo?: string
+  title?: string
+  slug?: string
+  summary?: string
+  time?: string
+}
+const items: Item[] = [
+  ...loadStream()
+    .slice(0, 10)
+    .map(
+      (s): Item => ({
+        key: `${s.date} ${s.time}`,
+        when: s.date,
+        time: s.time,
+        kind: 'stream',
+        html: renderText(s.text),
+        photo: s.photo,
+      }),
+    ),
+  ...[...notes]
+    .sort((a, b) => b.data.tended.localeCompare(a.data.tended))
+    .slice(0, 6)
+    .map(
+      (n): Item => ({
+        key: `${n.data.tended} 99`,
+        when: n.data.tended,
+        kind: 'note',
+        title: n.data.title,
+        slug: n.id,
+        summary: n.data.summary,
+      }),
+    ),
+]
+  .sort((a, b) => b.key.localeCompare(a.key))
+  .slice(0, 12)
+---
+<Base>
+  <div style="display:grid;gap:36px">
+    <section class="intro">
+      <h1>What I’m growing</h1>
+      <p>Notes on the things I build and think about. They change over time: a seedling is a fresh thought, an evergreen is settled.</p>
+    </section>
+
+    <section style="display:grid;gap:12px" aria-labelledby="plan-h">
+      <h2 class="label" id="plan-h">The plot</h2>
+      {beds.length ? (
+        <div class="plan">
+          {beds.map((b) => (
+            <div class="bed">
+              <p class="label"><a href={`${base}/topics/${b.topic}/`}>{b.topic}</a></p>
+              <ul class="plants">
+                {b.notes.map((n) => (
+                  <li class="plant"><a href={`${base}/${n.id}/`}><span class={`dot ${n.data.stage}`} aria-hidden="true"></span>{n.data.title}</a></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p class="empty">Nothing planted yet. Notes appear here after the first nightly digest or the first message to the garden bot.</p>
+      )}
+      <div class="key">
+        <span><span class="dot seedling" aria-hidden="true"></span>seedling</span>
+        <span><span class="dot budding" aria-hidden="true"></span>budding</span>
+        <span><span class="dot evergreen" aria-hidden="true"></span>evergreen</span>
+        {fallow.length > 0 && <span>· fallow: {fallow.join(', ')}</span>}
+      </div>
+    </section>
+
+    <section style="display:grid;gap:8px" aria-labelledby="lately-h">
+      <h2 class="label" id="lately-h">Lately</h2>
+      {items.length ? (
+        <ul class="lately">
+          {items.map((i) =>
+            i.kind === 'stream' ? (
+              <li>
+                <time datetime={i.when}>{shortDate(i.when)} · {i.time}</time>
+                {i.html && <div set:html={i.html} />}
+                {i.photo && <img class="thumb" src={`${base}/${i.photo}`} alt="" loading="lazy" />}
+              </li>
+            ) : (
+              <li>
+                <time datetime={i.when}>tended {shortDate(i.when)}</time>
+                <p><a href={`${base}/${i.slug}/`}>{i.title}</a>: {i.summary}</p>
+              </li>
+            ),
+          )}
+        </ul>
+      ) : (
+        <p class="empty">Nothing yet.</p>
+      )}
+      <p class="when"><a href={`${base}/stream/`}>All of the stream →</a></p>
+    </section>
+  </div>
+</Base>

@@ -1,0 +1,35 @@
+---
+import { getCollection } from 'astro:content'
+import { TOPICS } from '../../../lib/content/note.ts'
+import { shortDate } from '../../../lib/site/data.ts'
+import Base from '../../layouts/Base.astro'
+
+// movies and photography have their own pages
+export function getStaticPaths() {
+  return TOPICS.filter((t) => t !== 'movies' && t !== 'photography').map((topic) => ({ params: { topic } }))
+}
+
+const { topic } = Astro.params
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const notes = (await getCollection('notes'))
+  .filter((n) => n.data.topics.includes(topic))
+  .sort((a, b) => b.data.tended.localeCompare(a.data.tended))
+---
+<Base title={topic} current={`topics/${topic}`}>
+  <div style="display:grid;gap:20px">
+    <h1 class="page-title">{topic}</h1>
+    {notes.length ? (
+      <ul class="list">
+        {notes.map((n) => (
+          <li>
+            <span class="when"><span class={`dot ${n.data.stage}`} aria-hidden="true"></span> {n.data.stage} · tended {shortDate(n.data.tended)}</span>
+            <a href={`${base}/${n.id}/`}>{n.data.title}</a>
+            <p>{n.data.summary}</p>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="empty">This bed is fallow for now.</p>
+    )}
+  </div>
+</Base>
