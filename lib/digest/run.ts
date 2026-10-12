@@ -6,6 +6,7 @@ import { type ApplyResult, applyEdits, noteIndex } from '../content/apply.ts'
 import { type Edit, parseNote, splitFrontmatter } from '../content/note.ts'
 import type { commitAndPush } from '../git.ts'
 import type { notify } from '../notify.ts'
+import { localDate } from '../time.ts'
 import type { Runner } from './claude.ts'
 import { buildPayload, type DigestEdit, parseEdits, RULES } from './prompt.ts'
 import { type DigestState, loadState, saveState } from './state.ts'
@@ -35,10 +36,6 @@ export type DigestOptions = {
 }
 
 export const FULL_TEXT_BUDGET = 120_000
-
-export function localDate(now: Date): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Chisinau' }).format(now)
-}
 
 /** Notes shown in full, most recently tended first, until the character budget runs out. */
 export function fullTextNotes(root: string, budget = FULL_TEXT_BUDGET): { slug: string; text: string }[] {
