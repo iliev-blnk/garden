@@ -1,0 +1,10 @@
+[Unit]
+Description=garden digest at 22:00 Chișinău time (catches up after sleep)
+
+[Timer]
+OnCalendar=*-*-* 22:00:00 Europe/Chisinau
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

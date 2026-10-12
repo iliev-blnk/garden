@@ -1,0 +1,11 @@
+[Unit]
+Description=garden nightly chat digest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/DEV/garden
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node lib/cli.ts digest
+TimeoutStartSec=3h
