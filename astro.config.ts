@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { defineConfig } from 'astro/config'
 import { parseNote } from './lib/content/note.ts'
-import { remarkWikilinks } from './lib/site/wikilinks.ts'
+import { remarkNoHtml, remarkWikilinks } from './lib/site/wikilinks.ts'
 
 const BASE = '/garden'
 
@@ -19,5 +19,5 @@ export default defineConfig({
   site: 'https://iliev-blnk.github.io',
   base: BASE,
   trailingSlash: 'always',
-  markdown: { remarkPlugins: [[remarkWikilinks, { titles: noteTitles(), base: BASE }]] },
+  markdown: { remarkPlugins: [[remarkWikilinks, { titles: noteTitles(), base: BASE }], remarkNoHtml] },
 })

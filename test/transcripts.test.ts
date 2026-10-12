@@ -82,6 +82,29 @@ describe('isWorkSession', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tx-'))
     expect(isWorkSession(readTranscript(file(dir, 's.jsonl', sideChat), 0).entries, WORK)).toBe(false)
   })
+  it('is true when most tool calls touch a work directory, even from home', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tx-'))
+    const tool = (cmd: string) => claude([{ type: 'tool_use', name: 'Bash', input: { command: cmd } }])
+    const chat = [
+      user('clean up the old worktrees'),
+      tool('git -C /home/me/work/portal status'),
+      tool('ls /home/me/work'),
+      tool('cat /home/me/notes.txt'),
+    ].join('\n')
+    expect(isWorkSession(readTranscript(file(dir, 't.jsonl', chat), 0).entries, WORK)).toBe(true)
+  })
+  it('is false when only a few tool calls touch work', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tx-'))
+    const tool = (cmd: string) => claude([{ type: 'tool_use', name: 'Bash', input: { command: cmd } }])
+    const chat = [
+      user('garden'),
+      tool('ls /home/me/work'),
+      tool('ls /home/me/garden'),
+      tool('cat /home/me/garden/a'),
+      tool('pnpm test'),
+    ].join('\n')
+    expect(isWorkSession(readTranscript(file(dir, 't.jsonl', chat), 0).entries, WORK)).toBe(false)
+  })
   it('does not match a sibling directory that only shares the prefix', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tx-'))
     const chat = [user('x', { cwd: '/home/me/workshop' }), user('y', { cwd: '/home/me/workshop' })].join('\n')

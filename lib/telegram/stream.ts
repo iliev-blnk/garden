@@ -5,9 +5,12 @@ import type { EntryAction } from './parse.ts'
 
 const MEDIA = /!\[\]\(\.\.\/(media\/[^)]+)\)/
 
+/** An entry starts with a line that is exactly "## HH:MM". */
+const ENTRY_START = /^(?=## \d\d:\d\d$)/m
+
 function blocks(text: string): string[] {
   return text
-    .split(/^(?=## )/m)
+    .split(ENTRY_START)
     .map((b) => b.trim())
     .filter(Boolean)
 }
@@ -21,7 +24,8 @@ export function appendEntry(root: string, a: EntryAction, photoPath?: string, ca
   const lines = [`## ${localTime(a.at)}`]
   if (a.topic) lines.push(`topic: ${a.topic}`)
   const parts = [lines.join('\n')]
-  if (a.text) parts.push(a.text)
+  // A text line that looks like an entry heading would split the entry; a leading space defuses it.
+  if (a.text) parts.push(a.text.replace(/^(## \d\d:\d\d)$/gm, ' $1'))
   if (photoPath) parts.push(`![](../${photoPath})${camera ? `\n*${camera}*` : ''}`)
   const block = parts.join('\n\n')
 

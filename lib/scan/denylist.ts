@@ -16,6 +16,7 @@ export function loadDenylist(
   file = DENYLIST_FILE,
 ): string[] {
   if (env.GARDEN_DENYLIST) return terms(env.GARDEN_DENYLIST)
+  if (env.CI) throw new Error('GARDEN_DENYLIST is empty; refusing to scan in CI without it')
   if (existsSync(file)) return terms(readFileSync(file, 'utf8'))
   process.stderr.write(
     'garden: no denylist (GARDEN_DENYLIST or ~/.config/garden/denylist.txt); scanning without it\n',

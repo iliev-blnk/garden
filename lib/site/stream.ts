@@ -11,7 +11,7 @@ const PHOTO = /^!\[\]\(\.\.\/(media\/[^)]+)\)(?:\n\*(.+)\*)?$/
 
 export function parseStreamFile(date: string, text: string): StreamEntry[] {
   return text
-    .split(/^(?=## \d\d:\d\d)/m)
+    .split(/^(?=## \d\d:\d\d$)/m)
     .map((b) => b.trim())
     .filter(Boolean)
     .map((block) => {

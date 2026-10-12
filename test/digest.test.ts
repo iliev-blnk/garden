@@ -196,6 +196,15 @@ describe('digest', () => {
     expect(readFileSync(join(s.clone, 'notes/a.md'), 'utf8')).toContain(big)
   })
 
+  it('reverts a chat’s earlier chunks when a later chunk fails, so a retry cannot double them', async () => {
+    const s = setup([edits({ path: 'notes/half.md', content: note('half') }), envelope('not json')])
+    writeChat(s.projects, 'long', [userLine('x'.repeat(150_000)), userLine('y'.repeat(150_000))])
+    const res = await digest(s.opts)
+    expect(res.notes).toBe(0)
+    expect(existsSync(join(s.clone, 'notes/half.md'))).toBe(false)
+    expect(git(s.remote, 'log', '--format=%s', '-1', 'main')).toBe('init')
+  })
+
   it('in dry-run mode logs the edits and writes nothing', async () => {
     const s = setup([edits({ path: 'notes/x.md', content: note('x') })])
     writeChat(s.projects, 'a', [userLine('hello')])

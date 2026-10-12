@@ -32,10 +32,13 @@ describe('applyEdits', () => {
     expect(readFileSync(join(r, 'notes/holdshort.md'), 'utf8')).toBe(note())
   })
 
-  it('writes a stream file without note frontmatter', () => {
-    const r = root()
-    const res = applyEdits(r, [{ path: 'stream/2026-10-12.md', content: '## 09:14\n\nA thought.\n' }], [])
-    expect(res.applied).toEqual(['stream/2026-10-12.md'])
+  it('refuses to write stream files (they hold the user’s own words)', () => {
+    const res = applyEdits(
+      root(),
+      [{ path: 'stream/2026-10-12.md', content: '## 09:14\n\nA thought.\n' }],
+      [],
+    )
+    expect(res).toEqual({ applied: [], skipped: [{ path: 'stream/2026-10-12.md', reason: 'path' }] })
   })
 
   it.each([
@@ -92,14 +95,6 @@ describe('applyEdits', () => {
     const res = applyEdits(r, [{ path: 'notes/x.md', content: note({}, 'b'.repeat(400)) }], [])
     expect(res.skipped).toEqual([{ path: 'notes/x.md', reason: 'shrink' }])
     expect(readFileSync(join(r, 'notes/x.md'), 'utf8')).toContain('a'.repeat(1000))
-  })
-
-  it('skips a rewrite that drops most of a stream file', () => {
-    const r = root()
-    mkdirSync(join(r, 'stream'))
-    writeFileSync(join(r, 'stream/2026-10-12.md'), `## 09:00\n\n${'a'.repeat(1000)}\n`)
-    const res = applyEdits(r, [{ path: 'stream/2026-10-12.md', content: '## 09:00\n\nshort\n' }], [])
-    expect(res.skipped).toEqual([{ path: 'stream/2026-10-12.md', reason: 'shrink' }])
   })
 
   it('allows a rewrite that keeps at least half the body', () => {

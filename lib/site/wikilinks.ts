@@ -1,4 +1,4 @@
-import type { Link, Parent, PhrasingContent, Root, Text } from 'mdast'
+import type { Html, Link, Parent, PhrasingContent, Root, Text } from 'mdast'
 import { SKIP, visit } from 'unist-util-visit'
 import type { VFile } from 'vfile'
 
@@ -29,6 +29,26 @@ export function remarkWikilinks(opts: { titles: Map<string, string>; base: strin
       if (last < node.value.length) out.push({ type: 'text', value: node.value.slice(last) })
       parent.children.splice(index, 1, ...(out as typeof parent.children))
       return [SKIP, index + out.length]
+    })
+  }
+}
+
+/** Raw HTML in a note is shown as text: notes are written unattended, so no markup goes live. */
+export function remarkNoHtml() {
+  return (tree: Root) => {
+    visit(tree, 'html', (node: Html, index, parent: Parent | undefined) => {
+      if (!parent || index === undefined) return
+      const text: Text = { type: 'text', value: node.value }
+      const inline =
+        parent.type === 'paragraph' ||
+        parent.type === 'emphasis' ||
+        parent.type === 'strong' ||
+        parent.type === 'link'
+      parent.children.splice(
+        index,
+        1,
+        (inline ? text : { type: 'paragraph', children: [text] }) as (typeof parent.children)[number],
+      )
     })
   }
 }

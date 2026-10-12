@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -116,4 +116,11 @@ describe('backfill', () => {
     await backfill({ ...s.opts, maxChats: 5 })
     expect(s.runner).toHaveBeenCalledTimes(5)
   })
+  it('does not loop on a transcript whose last line is cut off', async () => {
+    const s = setup(0)
+    const path = writeChat(join(s.opts.projectsDir), 'cut', [userLine('hello')])
+    appendFileSync(path, '{"type":"user","message":')
+    await backfill(s.opts)
+    expect(s.runner).toHaveBeenCalledTimes(1)
+  }, 10_000)
 })

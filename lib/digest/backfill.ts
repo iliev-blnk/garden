@@ -35,13 +35,11 @@ export async function backfill(o: BackfillOptions): Promise<void> {
     }))
   if (memory.length) await processSources(o, memory)
 
-  const failed = new Set<string>()
-  // A dry run marks nothing digested, so exclude everything already seen to move on.
+  // Never revisit a chat in the same run: failed ones, dry-run ones and ones whose last line is cut off.
   const seen = new Set<string>()
   let left = o.maxChats ?? Number.POSITIVE_INFINITY
   while (left > 0) {
-    const res = await digest({ ...o, limit: Math.min(o.batch, left), exclude: o.dryRun ? seen : failed })
-    for (const key of res.failed) failed.add(key)
+    const res = await digest({ ...o, limit: Math.min(o.batch, left), exclude: seen })
     for (const key of res.keys) seen.add(key)
     if (!res.sources) break
     left -= res.sources

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
 import { type ApplyResult, applyEdits, noteIndex } from '../content/apply.ts'
@@ -138,6 +138,9 @@ export async function processSources(o: DigestOptions, sources: Source[]): Promi
 
   for (const source of sources) {
     let ok = true
+    // What each file held before this source touched it (null = did not exist), to undo a half-done source.
+    const before = new Map<string, string | null>()
+    const appliedBefore = new Set(applied)
     for (const chunk of source.work ? [] : source.chunks) {
       const fullText = fullTextNotes(o.root, o.fullTextBudget)
       const payload = buildPayload({
@@ -160,12 +163,25 @@ export async function processSources(o: DigestOptions, sources: Source[]): Promi
         continue
       }
       const resolved = resolveEdits(o.root, edits, new Set(fullText.map((n) => n.slug)), today)
+      for (const e of resolved.ready) {
+        const file = join(o.root, e.path)
+        if (!before.has(e.path)) before.set(e.path, existsSync(file) ? readFileSync(file, 'utf8') : null)
+      }
       const result = applyEdits(o.root, resolved.ready, o.denylist)
       for (const p of result.applied) applied.add(p)
       skipped.push(...resolved.skipped, ...result.skipped)
     }
-    if (ok) done[source.key] = source.end
-    else failed.push(source.key)
+    if (ok) {
+      done[source.key] = source.end
+      continue
+    }
+    failed.push(source.key)
+    for (const [path, old] of before) {
+      const file = join(o.root, path)
+      if (old === null) rmSync(file, { force: true })
+      else writeFileSync(file, old)
+      if (!appliedBefore.has(path)) applied.delete(path)
+    }
   }
 
   const summary = {

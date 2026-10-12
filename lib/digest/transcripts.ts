@@ -62,11 +62,22 @@ export function readTranscript(path: string, from: number): { entries: Entry[]; 
 
 const under = (cwd: string, dir: string) => cwd === dir || cwd.startsWith(dir.endsWith(sep) ? dir : dir + sep)
 
+/** Work if most entries ran in a work directory, or most tool calls touched one (work done from ~ by absolute path). */
 export function isWorkSession(entries: Entry[], workDirs: string[]): boolean {
+  if (!workDirs.length) return false
   const cwds = entries.map((e) => e.cwd).filter((c): c is string => typeof c === 'string')
-  if (!cwds.length || !workDirs.length) return false
-  const work = cwds.filter((c) => workDirs.some((d) => under(c, d))).length
-  return work > cwds.length / 2
+  const workCwds = cwds.filter((c) => workDirs.some((d) => under(c, d))).length
+  if (cwds.length && workCwds > cwds.length / 2) return true
+  const tools = entries.flatMap((e) =>
+    e.type === 'assistant' && Array.isArray(e.message?.content)
+      ? (e.message.content as (Block & { input?: unknown })[]).filter((b) => b.type === 'tool_use')
+      : [],
+  )
+  const touching = tools.filter((b) => {
+    const input = JSON.stringify(b.input ?? '')
+    return workDirs.some((d) => input.includes(d))
+  }).length
+  return tools.length > 0 && touching > tools.length / 2
 }
 
 const HIDDEN_TAGS = /<(system-reminder|command-[\w-]+|local-command-[\w-]+)>[\s\S]*?<\/\1>/g

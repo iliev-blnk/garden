@@ -111,4 +111,23 @@ describe('telegramRun', () => {
     expect(await run(clone, api)).toEqual({ planted: 0, refused: 0, undone: 0 })
     expect(git(remote, 'log', '--format=%s', '-1', 'main')).toBe('init')
   })
+  it('keeps going past a message it cannot use, replies, and still moves the offset', async () => {
+    const { remote, clone } = remoteAndClone()
+    const bad = update({ document: { file_id: 'heic', mime_type: 'image/heic' } })
+    const good = update({ text: 'after the bad one' })
+    const { api, sent } = fakeApi([bad, good], { heic: Buffer.from('not an image') })
+    expect(await run(clone, api)).toMatchObject({ planted: 1 })
+    expect(sent[0]).toMatch(/^could not use that message/)
+    expect(sent[1]).toMatch(/^🌱 planted/)
+    expect(git(remote, 'show', 'main:.garden/telegram.json')).toContain(String(good.update_id + 1))
+  })
+
+  it('still reports what changed when a reply fails to send', async () => {
+    const { clone } = remoteAndClone()
+    const { api } = fakeApi([update({ text: 'one' }), update({ text: 'two' })])
+    api.send = vi.fn(async () => {
+      throw new Error('429 Too Many Requests')
+    })
+    expect(await run(clone, api)).toEqual({ planted: 2, refused: 0, undone: 0 })
+  })
 })

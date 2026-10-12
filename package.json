@@ -10,7 +10,7 @@
     "check": "biome check . && tsc --noEmit",
     "garden": "node lib/cli.ts",
     "prepare": "git config core.hooksPath hooks",
-    "build": "node lib/cli.ts scan notes stream media && astro build && cp -r media dist/media 2>/dev/null; pagefind --site dist",
+    "build": "node lib/cli.ts scan notes stream media && node lib/cli.ts links && astro build && (test ! -d media || cp -r media dist/media) && pagefind --site dist",
     "dev": "astro dev",
     "preview": "astro preview",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"

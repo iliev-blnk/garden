@@ -1,3 +1,6 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 const LINK = /\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g
 
 export function linkedSlugs(body: string): string[] {
@@ -14,4 +17,18 @@ export function backlinks(notes: { slug: string; body: string }[]): Map<string, 
     }
   }
   return map
+}
+
+/** Every [[link]] (outside inline code) whose note doesn't exist; the build fails on any. */
+export function brokenLinks(root: string): { file: string; slug: string }[] {
+  const dir = join(root, 'notes')
+  if (!existsSync(dir)) return []
+  const names = readdirSync(dir).filter((n) => n.endsWith('.md'))
+  const slugs = new Set(names.map((n) => n.slice(0, -3)))
+  return names.flatMap((n) => {
+    const body = readFileSync(join(dir, n), 'utf8').replace(/`[^`\n]*`/g, '')
+    return linkedSlugs(body)
+      .filter((s) => !slugs.has(s))
+      .map((slug) => ({ file: `notes/${n}`, slug }))
+  })
 }

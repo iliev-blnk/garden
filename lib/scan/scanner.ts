@@ -1,3 +1,5 @@
+import { toLatin } from '../content/translit.ts'
+
 export type FindingKind = 'secret' | 'email' | 'phone' | 'ip' | 'iban' | 'card' | 'gps' | 'denylist'
 export type Finding = { kind: FindingKind; index: number; redacted: string }
 
@@ -65,14 +67,13 @@ function isPublicIp(parts: number[]): boolean {
   return true
 }
 
-/** Lowercase, strip diacritics, keep only [a-z0-9]; `map[i]` is the original index of normalised char i. */
+/** Latin-only lowercase letters and digits (Cyrillic transliterated, diacritics dropped); `map[i]` is the original index of normalised char i. */
 function normalise(text: string): { norm: string; map: number[] } {
   let norm = ''
   const map: number[] = []
   for (let i = 0; i < text.length; i++) {
-    const base = text[i].normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
-    for (const c of base) {
-      if (/[a-z0-9]/.test(c)) {
+    for (const c of toLatin(text[i])) {
+      if (/[\p{L}\p{N}]/u.test(c)) {
         norm += c
         map.push(i)
       }

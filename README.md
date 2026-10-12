@@ -35,7 +35,7 @@ The bot answers `🌱 planted` once the entry is live, or says why it refused.
 ```sh
 pnpm install
 pnpm test                 # unit tests
-pnpm build                # scan, build the site, index search
+pnpm build                # scan, check links, build the site, index search
 pnpm test:e2e             # browser smoke test (after a build; needs Chromium)
 
 node lib/cli.ts digest [--dry-run]                 # tonight's digest, now
@@ -44,7 +44,7 @@ node lib/cli.ts scan notes stream media            # privacy scan
 node lib/cli.ts telegram                           # what the hourly Action runs
 ```
 
-Local settings live in `~/.config/garden/env` (`GARDEN_WORK_DIRS`, `GARDEN_WORK_MEMORY`, `GARDEN_BOT_TOKEN`, `GARDEN_CHAT_ID`) and `~/.config/garden/denylist.txt`. The nightly timer is installed with `deploy/install.sh`.
+Local settings live in `~/.config/garden/env` (`GARDEN_WORK_DIRS`, `GARDEN_WORK_MEMORY`, `GARDEN_BOT_TOKEN`, `GARDEN_CHAT_ID`) and `~/.config/garden/denylist.txt`. The nightly timer is installed with `deploy/install.sh`. The digest never touches this checkout: it works in its own copy at `~/.local/share/garden/workspace`, reset to `origin/main` on every run.
 
 ## Stack
 

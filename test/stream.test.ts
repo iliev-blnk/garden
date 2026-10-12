@@ -39,6 +39,14 @@ describe('appendEntry', () => {
       '## 09:14\n\nfog\n\n![](../media/2026/7.webp)\n*X-T30 · 23mm · f/2*\n',
     )
   })
+
+  it('keeps a line starting with ## inside its own entry', () => {
+    const r = root()
+    appendEntry(r, { kind: 'entry', at: morning, text: 'notes\n## 21:00 not a heading' })
+    appendEntry(r, { kind: 'entry', at: evening, text: 'later' })
+    expect(undoLast(r)).toEqual({ path: 'stream/2026-10-12.md' })
+    expect(readFileSync(join(r, 'stream/2026-10-12.md'), 'utf8')).toContain('not a heading')
+  })
 })
 
 describe('undoLast', () => {

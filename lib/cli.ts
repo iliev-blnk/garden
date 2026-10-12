@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, symlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -7,10 +7,12 @@ import { backfill } from './digest/backfill.ts'
 import { claudeRunner } from './digest/claude.ts'
 import { digest } from './digest/run.ts'
 import { STATE_FILE } from './digest/state.ts'
-import { commitAndPush } from './git.ts'
+import { commitAndPush, prepareWorkspace } from './git.ts'
 import { notify } from './notify.ts'
+import { withPing } from './ping.ts'
 import { loadDenylist } from './scan/denylist.ts'
 import { expandPaths, type PathFindings, scanPaths, scanStaged } from './scan/repo.ts'
+import { brokenLinks } from './site/backlinks.ts'
 import { httpApi, telegramRun } from './telegram/run.ts'
 
 function report(hits: PathFindings[]): number {
@@ -23,6 +25,7 @@ function report(hits: PathFindings[]): number {
 const ROOT = resolve(import.meta.dirname, '..')
 export const SITE_URL = 'https://iliev-blnk.github.io/garden/'
 const PROJECTS = join(homedir(), '.claude/projects')
+const WORKSPACE = join(homedir(), '.local/share/garden/workspace')
 
 /** Loads KEY=value lines from ~/.config/garden/env without overriding the real environment. */
 function loadEnvFile(file = join(homedir(), '.config/garden/env')) {
@@ -47,57 +50,71 @@ async function main(argv: string[]): Promise<number> {
       if (args[0] === '--staged') return report(await scanStaged(process.cwd(), denylist))
       return report(await scanPaths(expandPaths(args), denylist))
     }
+    case 'links': {
+      const broken = brokenLinks(process.cwd())
+      for (const b of broken) process.stderr.write(`${b.file}: broken link [[${b.slug}]]\n`)
+      return broken.length ? 1 : 0
+    }
     case 'digest':
-    case 'backfill': {
-      const opts = {
-        root: ROOT,
-        projectsDir: PROJECTS,
-        stateFile: STATE_FILE,
-        skipDirs: [ownProjectDir()],
-        workDirs: workDirs(),
-        denylist: loadDenylist(),
-        runner: claudeRunner,
-        build: async () => {
-          await promisify(execFile)('pnpm', ['run', 'build'], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
-        },
-        push: commitAndPush,
-        notify,
-        dryRun: args.includes('--dry-run'),
-      }
-      if (cmd === 'backfill') {
-        if (!process.env.GARDEN_WORK_MEMORY)
-          throw new Error('GARDEN_WORK_MEMORY is not set; refusing to backfill without it')
-        const limit = args.indexOf('--limit')
-        await backfill({
-          ...opts,
-          memoryDir: join(projectDirFor(homedir()), 'memory'),
-          workMemory: new RegExp(process.env.GARDEN_WORK_MEMORY, 'i'),
-          batch: 10,
-          maxChats: limit === -1 ? undefined : Number(args[limit + 1]),
-        })
+    case 'backfill':
+      return withPing(cmd, notify, async () => {
+        // Unattended runs work in their own copy at origin/main, never in this checkout.
+        await prepareWorkspace(ROOT, WORKSPACE)
+        if (!existsSync(join(WORKSPACE, 'node_modules')))
+          symlinkSync(join(ROOT, 'node_modules'), join(WORKSPACE, 'node_modules'))
+        const opts = {
+          root: WORKSPACE,
+          projectsDir: PROJECTS,
+          stateFile: STATE_FILE,
+          skipDirs: [ownProjectDir()],
+          workDirs: workDirs(),
+          denylist: loadDenylist(),
+          runner: claudeRunner,
+          build: async () => {
+            await promisify(execFile)('pnpm', ['run', 'build'], {
+              cwd: WORKSPACE,
+              maxBuffer: 64 * 1024 * 1024,
+            })
+          },
+          push: commitAndPush,
+          notify,
+          dryRun: args.includes('--dry-run'),
+        }
+        if (cmd === 'backfill') {
+          if (!process.env.GARDEN_WORK_MEMORY)
+            throw new Error('GARDEN_WORK_MEMORY is not set; refusing to backfill without it')
+          const limit = args.indexOf('--limit')
+          await backfill({
+            ...opts,
+            memoryDir: join(projectDirFor(homedir()), 'memory'),
+            workMemory: new RegExp(process.env.GARDEN_WORK_MEMORY, 'i'),
+            batch: 10,
+            maxChats: limit === -1 ? undefined : Number(args[limit + 1]),
+          })
+          return 0
+        }
+        const res = await digest(opts)
+        process.stdout.write(`digest: ${res.notes} notes, ${res.skipped} skipped\n`)
         return 0
-      }
-      const res = await digest(opts)
-      process.stdout.write(`digest: ${res.notes} notes, ${res.skipped} skipped\n`)
-      return 0
-    }
-    case 'telegram': {
-      const token = process.env.GARDEN_BOT_TOKEN
-      const chatId = process.env.GARDEN_CHAT_ID
-      if (!token || !chatId) throw new Error('GARDEN_BOT_TOKEN and GARDEN_CHAT_ID are required')
-      const res = await telegramRun({
-        root: ROOT,
-        api: httpApi(token, chatId),
-        chatId,
-        denylist: loadDenylist(),
-        push: commitAndPush,
-        siteUrl: SITE_URL,
       })
-      process.stdout.write(`telegram: ${res.planted} planted, ${res.refused} refused\n`)
-      if (process.env.GITHUB_OUTPUT)
-        appendFileSync(process.env.GITHUB_OUTPUT, `changed=${res.planted + res.undone}\n`)
-      return 0
-    }
+    case 'telegram':
+      return withPing(cmd, notify, async () => {
+        const token = process.env.GARDEN_BOT_TOKEN
+        const chatId = process.env.GARDEN_CHAT_ID
+        if (!token || !chatId) throw new Error('GARDEN_BOT_TOKEN and GARDEN_CHAT_ID are required')
+        const res = await telegramRun({
+          root: ROOT,
+          api: httpApi(token, chatId),
+          chatId,
+          denylist: loadDenylist(),
+          push: commitAndPush,
+          siteUrl: SITE_URL,
+        })
+        process.stdout.write(`telegram: ${res.planted} planted, ${res.refused} refused\n`)
+        if (process.env.GITHUB_OUTPUT)
+          appendFileSync(process.env.GITHUB_OUTPUT, `changed=${res.planted + res.undone}\n`)
+        return 0
+      })
     default:
       process.stderr.write(
         'usage: garden <scan|telegram|digest [--dry-run]|backfill [--limit N] [--dry-run]>\n',

@@ -32,6 +32,12 @@ describe('scanText flags', () => {
     expect(kinds('worked at acme-corp', ['Acme Corp'])).toEqual(['denylist'])
     expect(kinds('ACMECORP', ['Acme Corp'])).toEqual(['denylist'])
   })
+  it('Cyrillic denylist terms in Cyrillic text', () =>
+    expect(kinds('встретил Иван Петров вчера', ['Иван Петров'])).toEqual(['denylist']))
+  it('a Latin denylist term written in Cyrillic', () =>
+    expect(kinds('сказал Иван', ['Ivan'])).toEqual(['denylist']))
+  it('a Cyrillic denylist term written in Latin', () =>
+    expect(kinds('met Ivan today', ['Иван'])).toEqual(['denylist']))
   it('denylist terms ignoring diacritics', () =>
     expect(kinds('drive to cimislia', ['Cimișlia'])).toEqual(['denylist']))
 })

@@ -6,20 +6,16 @@ import { type Edit, parseNote, splitFrontmatter, type Topic } from './note.ts'
 export type ApplyResult = { applied: string[]; skipped: { path: string; reason: string }[] }
 
 const NOTE_PATH = /^notes\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/
-const STREAM_PATH = /^stream\/\d{4}-\d{2}-\d{2}\.md$/
 const SHRINK_LIMIT = 0.5
 
 const bodyOf = (text: string) => splitFrontmatter(text)?.body ?? text
 
 function reasonToSkip(root: string, edit: Edit, denylist: string[]): string | null {
-  const isNote = NOTE_PATH.test(edit.path)
-  if (!isNote && !STREAM_PATH.test(edit.path)) return 'path'
-  if (isNote) {
-    try {
-      parseNote(edit.content)
-    } catch {
-      return 'frontmatter'
-    }
+  if (!NOTE_PATH.test(edit.path)) return 'path'
+  try {
+    parseNote(edit.content)
+  } catch {
+    return 'frontmatter'
   }
   const [finding] = scanText(edit.content, denylist)
   if (finding) return `scan:${finding.kind}`
@@ -32,7 +28,7 @@ function reasonToSkip(root: string, edit: Edit, denylist: string[]): string | nu
   return null
 }
 
-/** Create-or-replace only, inside notes/ and stream/; each edit stands or falls on its own. */
+/** Create-or-replace only, inside notes/ (stream files are the user's own words); each edit stands or falls on its own. */
 export function applyEdits(root: string, edits: Edit[], denylist: string[]): ApplyResult {
   const result: ApplyResult = { applied: [], skipped: [] }
   for (const edit of edits) {

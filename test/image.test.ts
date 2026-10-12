@@ -24,6 +24,12 @@ describe('loadDenylist', () => {
     writeFileSync(file, '# work\nAcme Corp\n\nWidgetco\n')
     expect(loadDenylist({}, file)).toEqual(['Acme Corp', 'Widgetco'])
   })
+  it('refuses to run without a denylist in CI', () => {
+    expect(() => loadDenylist({ CI: 'true' }, '/nonexistent/denylist.txt')).toThrow(/GARDEN_DENYLIST/)
+    expect(() => loadDenylist({ CI: 'true', GARDEN_DENYLIST: '' }, '/nonexistent/denylist.txt')).toThrow(
+      /GARDEN_DENYLIST/,
+    )
+  })
   it('returns an empty list when neither exists', () => {
     expect(loadDenylist({}, '/nonexistent/denylist.txt')).toEqual([])
   })

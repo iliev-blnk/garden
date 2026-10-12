@@ -60,6 +60,16 @@ describe('parseUpdate', () => {
     expect(a).toMatchObject({ kind: 'entry', text: '', photo: { fileId: 'doc', asFile: true } })
   })
 
+  it.each(['/start', '/help', '/settings@gardenibot'])(
+    'answers the command %s instead of publishing it',
+    (text) => {
+      expect(parseUpdate(msg({ text }), CHAT)).toEqual({
+        kind: 'unsupported',
+        reply: 'commands: /undo removes your last entry',
+      })
+    },
+  )
+
   it('recognises /undo', () => {
     expect(parseUpdate(msg({ text: '/undo' }), CHAT)).toEqual({ kind: 'undo' })
   })

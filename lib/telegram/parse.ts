@@ -26,6 +26,7 @@ export type Action =
   | { kind: 'ignore' }
 
 const UNSUPPORTED: Action = { kind: 'unsupported', reply: 'only text, links and photos' }
+const COMMANDS: Action = { kind: 'unsupported', reply: 'commands: /undo removes your last entry' }
 
 const HASHTAGS: Record<string, Topic> = {
   movie: 'movies',
@@ -65,7 +66,8 @@ export function parseUpdate(update: TgUpdate, chatId: string): Action {
   }
 
   const raw = photo ? (msg.caption ?? '') : (msg.text ?? '')
-  if (!photo && raw.trim() === '/undo') return { kind: 'undo' }
+  const command = !photo && /^\/([a-z_]+)(@\w+)?\s*$/i.exec(raw.trim())
+  if (command) return command[1].toLowerCase() === 'undo' ? { kind: 'undo' } : COMMANDS
   const { text, topic } = routed(raw)
   return { kind: 'entry', at, text, ...(topic ? { topic } : {}), ...(photo ? { photo } : {}) }
 }
