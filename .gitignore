@@ -2,5 +2,5 @@ node_modules
 dist
 .astro
 .env*
-denylist*
+denylist*.txt
 .superpowers
