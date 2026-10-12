@@ -1,14 +1,7 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": [
-      "**",
-      "!dist",
-      "!node_modules",
-      "!media",
-      "!.astro",
-      "!.superpowers"
-    ]
+    "includes": ["**", "!dist", "!node_modules", "!media", "!.astro", "!.superpowers"]
   },
   "formatter": {
     "indentStyle": "space",
@@ -36,9 +29,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "**/*.astro"
-      ],
+      "includes": ["**/*.astro"],
       "linter": {
         "rules": {
           "correctness": {

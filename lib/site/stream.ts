@@ -36,17 +36,24 @@ export function parseStreamFile(date: string, text: string): StreamEntry[] {
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+const URL_RE = /https?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g
+
+function linkify(p: string): string {
+  let out = ''
+  let last = 0
+  for (const m of p.matchAll(URL_RE)) {
+    const url = esc(m[0])
+    out += `${esc(p.slice(last, m.index))}<a href="${url}">${url}</a>`
+    last = m.index + m[0].length
+  }
+  return out + esc(p.slice(last))
+}
+
 /** Plain text from Telegram → safe HTML paragraphs with bare URLs linked. */
 export function renderText(text: string): string {
   return text
     .split(/\n{2,}/)
     .filter((p) => p.trim())
-    .map((p) => {
-      const linked = p.replace(/https?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g, (url) => `\u0000${url}\u0001`)
-      const html = esc(linked)
-        .replace(/\u0000([^\u0001]+)\u0001/g, (_, u) => `<a href="${u}">${u}</a>`)
-        .replace(/\n/g, '<br>')
-      return `<p>${html}</p>`
-    })
+    .map((p) => `<p>${linkify(p).replace(/\n/g, '<br>')}</p>`)
     .join('')
 }

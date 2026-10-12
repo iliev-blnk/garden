@@ -1,0 +1,40 @@
+---
+import { getCollection } from 'astro:content'
+import { loadStream, shortDate } from '../../../lib/site/data.ts'
+import { renderText } from '../../../lib/site/stream.ts'
+import Base from '../../layouts/Base.astro'
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const movies = (await getCollection('notes'))
+  .filter((n) => n.data.topics.includes('movies'))
+  .sort((a, b) => (b.data.rating ?? -1) - (a.data.rating ?? -1) || b.data.tended.localeCompare(a.data.tended))
+const quick = loadStream().filter((s) => s.topic === 'movies')
+---
+<Base title="Movies" current="topics/movies">
+  <div style="display:grid;gap:24px">
+    <h1 class="page-title">Movies</h1>
+    {movies.length ? (
+      <ul class="list">
+        {movies.map((n) => (
+          <li>
+            <span class="when">{n.data.rating !== undefined ? `${n.data.rating}/10 · ` : ''}tended {shortDate(n.data.tended)}</span>
+            <a href={`${base}/${n.id}/`}>{n.data.title}</a>
+            <p>{n.data.summary}</p>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="empty">No movie notes yet. Send the garden bot a message starting with #movie.</p>
+    )}
+    {quick.length > 0 && (
+      <section style="display:grid;gap:8px">
+        <h2 class="label">From the stream</h2>
+        <ul class="lately">
+          {quick.map((s) => (
+            <li><time datetime={s.date}>{shortDate(s.date)} · {s.time}</time><div set:html={renderText(s.text)} /></li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+</Base>

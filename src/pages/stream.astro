@@ -1,0 +1,35 @@
+---
+import { loadStream, shortDate } from '../../lib/site/data.ts'
+import { renderText } from '../../lib/site/stream.ts'
+import Base from '../layouts/Base.astro'
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const days = Map.groupBy(loadStream(), (s) => s.date)
+---
+<Base title="Stream" current="stream">
+  <div style="display:grid;gap:28px" data-pagefind-body>
+    <div style="display:grid;gap:6px">
+      <h1 class="page-title">Stream</h1>
+      <p class="empty">Quick thoughts and photos, sent from my phone. The nightly digest folds the ones that matter into notes.</p>
+    </div>
+    {days.size ? (
+      [...days].map(([date, entries]) => (
+        <section style="display:grid;gap:4px" id={date}>
+          <h2 class="label">{shortDate(date)} {date.slice(0, 4)}</h2>
+          <ul class="lately">
+            {entries.map((s) => (
+              <li>
+                <time datetime={`${s.date}T${s.time}`}>{s.time}{s.topic ? ` · ${s.topic}` : ''}</time>
+                {s.text && <div set:html={renderText(s.text)} />}
+                {s.photo && <img class="thumb" src={`${base}/${s.photo}`} alt={s.text || ''} loading="lazy" />}
+                {s.camera && <span class="when">{s.camera}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    ) : (
+      <p class="empty">Nothing in the stream yet.</p>
+    )}
+  </div>
+</Base>

@@ -1,0 +1,33 @@
+---
+import { loadStream, shortDate } from '../../../lib/site/data.ts'
+import Base from '../../layouts/Base.astro'
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const photos = loadStream().filter((s) => s.photo)
+---
+<Base title="Photography" current="topics/photography">
+  <div style="display:grid;gap:24px">
+    <h1 class="page-title">Photography</h1>
+    {photos.length ? (
+      <div class="photos">
+        {photos.map((p) => (
+          <figure>
+            <img src={`${base}/${p.photo}`} alt={p.text || `Photo from ${shortDate(p.date)}`} loading="lazy" />
+            <figcaption>
+              {p.text && <span>{p.text}</span>}
+              <span class="when">{shortDate(p.date)}{p.camera ? ` · ${p.camera}` : ''}</span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    ) : (
+      <p class="empty">No photos yet. Send one to the garden bot; send it as a file to keep the camera settings.</p>
+    )}
+  </div>
+</Base>
+<style>
+  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 22px 16px }
+  figure { margin: 0; display: grid; gap: 6px; align-content: start; min-width: 0 }
+  figure img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 3px; background: var(--bed) }
+  figcaption { display: grid; gap: 2px; font-size: 15px }
+</style>

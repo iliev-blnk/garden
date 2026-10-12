@@ -1,0 +1,21 @@
+---
+import Base from '../layouts/Base.astro'
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+---
+<Base title="Search" current="search">
+  <div style="display:grid;gap:16px;max-width:68ch">
+    <h1 class="page-title">Search</h1>
+    <link href={`${base}/pagefind/pagefind-ui.css`} rel="stylesheet" />
+    <div id="search"></div>
+    <script is:inline define:vars={{ base }}>
+      const s = document.createElement('script')
+      s.src = `${base}/pagefind/pagefind-ui.js`
+      s.onload = () => new PagefindUI({ element: '#search', showSubResults: true, showImages: false, autofocus: true })
+      document.head.appendChild(s)
+    </script>
+  </div>
+</Base>
+<style is:global>
+  #search { --pagefind-ui-primary: var(--leaf); --pagefind-ui-text: var(--fg); --pagefind-ui-background: var(--bg); --pagefind-ui-border: var(--line); --pagefind-ui-tag: var(--bed); --pagefind-ui-font: var(--body) }
+</style>
