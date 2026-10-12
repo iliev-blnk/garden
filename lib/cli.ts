@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -11,6 +11,7 @@ import { commitAndPush } from './git.ts'
 import { notify } from './notify.ts'
 import { loadDenylist } from './scan/denylist.ts'
 import { expandPaths, type PathFindings, scanPaths, scanStaged } from './scan/repo.ts'
+import { httpApi, telegramRun } from './telegram/run.ts'
 
 function report(hits: PathFindings[]): number {
   for (const { path, findings } of hits) {
@@ -20,6 +21,7 @@ function report(hits: PathFindings[]): number {
 }
 
 const ROOT = resolve(import.meta.dirname, '..')
+export const SITE_URL = 'https://iliev-blnk.github.io/garden/'
 const PROJECTS = join(homedir(), '.claude/projects')
 
 /** Loads KEY=value lines from ~/.config/garden/env without overriding the real environment. */
@@ -79,8 +81,27 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write(`digest: ${res.notes} notes, ${res.skipped} skipped\n`)
       return 0
     }
+    case 'telegram': {
+      const token = process.env.GARDEN_BOT_TOKEN
+      const chatId = process.env.GARDEN_CHAT_ID
+      if (!token || !chatId) throw new Error('GARDEN_BOT_TOKEN and GARDEN_CHAT_ID are required')
+      const res = await telegramRun({
+        root: ROOT,
+        api: httpApi(token, chatId),
+        chatId,
+        denylist: loadDenylist(),
+        push: commitAndPush,
+        siteUrl: SITE_URL,
+      })
+      process.stdout.write(`telegram: ${res.planted} planted, ${res.refused} refused\n`)
+      if (process.env.GITHUB_OUTPUT)
+        appendFileSync(process.env.GITHUB_OUTPUT, `changed=${res.planted + res.undone}\n`)
+      return 0
+    }
     default:
-      process.stderr.write('usage: garden <scan|digest [--dry-run]|backfill [--limit N] [--dry-run]>\n')
+      process.stderr.write(
+        'usage: garden <scan|telegram|digest [--dry-run]|backfill [--limit N] [--dry-run]>\n',
+      )
       return 2
   }
 }
