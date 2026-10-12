@@ -54,7 +54,7 @@ describe('digest', () => {
       claudeLine('Three directions.'),
     ])
     const res = await digest(s.opts)
-    expect(res).toEqual({ notes: 2, skipped: 0 })
+    expect(res).toMatchObject({ notes: 2, skipped: 0 })
     expect(git(s.remote, 'log', '--format=%s', '-1', 'main')).toBe('Digest 2026-10-12: 2 notes')
     expect(git(s.remote, 'ls-tree', '--name-only', '-r', 'main')).toContain('notes/hoodie.md')
     expect(loadState(s.stateFile)[chat].size).toBe(readFileSync(chat).length)
@@ -121,7 +121,7 @@ describe('digest', () => {
     ])
     const chat = writeChat(s.projects, 'a', [userLine('hello')])
     const res = await digest(s.opts)
-    expect(res).toEqual({ notes: 1, skipped: 1 })
+    expect(res).toMatchObject({ notes: 1, skipped: 1 })
     expect(s.notifyFn).toHaveBeenCalledTimes(1)
     expect(s.notifyFn.mock.calls[0][0]).toContain('skipped notes/leak.md (scan:email)')
     expect(s.notifyFn.mock.calls[0][0]).not.toContain(email)

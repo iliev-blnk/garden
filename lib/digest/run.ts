@@ -27,6 +27,10 @@ export type DigestOptions = {
   now?: Date
   dryRun?: boolean
   fullTextBudget?: number
+  /** At most this many changed chats per run (backfill batches). */
+  limit?: number
+  /** Transcripts to leave alone in this run (backfill: ones that already failed). */
+  exclude?: Set<string>
   log?: (line: string) => void
 }
 
@@ -100,26 +104,44 @@ async function restore(root: string, paths: string[]) {
   }
 }
 
-export async function digest(o: DigestOptions): Promise<{ notes: number; skipped: number }> {
+/** One thing to digest: a chat (or the new part of one) or a memory file. */
+export type Source = { key: string; label: string; chunks: string[]; end: number; work: boolean }
+export type DigestResult = {
+  notes: number
+  skipped: number
+  sources: number
+  failed: string[]
+  keys: string[]
+}
+
+export async function digest(o: DigestOptions): Promise<DigestResult> {
   if (!o.workDirs.length)
     throw new Error('GARDEN_WORK_DIRS is not set; refusing to digest without a work filter')
+  const changed = findChanged(o.projectsDir, loadState(o.stateFile), o.skipDirs)
+    .filter((c) => !o.exclude?.has(c.path))
+    .slice(0, o.limit ?? Number.POSITIVE_INFINITY)
+  const sources = changed.map((c): Source => {
+    const { entries, end } = readTranscript(c.path, c.from)
+    const work = isWorkSession(entries, o.workDirs)
+    return { key: c.path, label: basename(c.path), chunks: work ? [] : condense(entries), end, work }
+  })
+  return processSources(o, sources)
+}
+
+/** Ask Claude about each source, apply, build, push; only then remember the sources as digested. */
+export async function processSources(o: DigestOptions, sources: Source[]): Promise<DigestResult> {
   const log = o.log ?? ((line: string) => process.stdout.write(`${line}\n`))
   const today = localDate(o.now ?? new Date())
-  const state: DigestState = loadState(o.stateFile)
   const done: Record<string, number> = {}
+  const failed: string[] = []
   const applied = new Set<string>()
   const skipped: ApplyResult['skipped'] = []
   const problems: string[] = []
   const streamFile = join(o.root, 'stream', `${today}.md`)
 
-  for (const chat of findChanged(o.projectsDir, state, o.skipDirs)) {
-    const { entries, end } = readTranscript(chat.path, chat.from)
-    if (isWorkSession(entries, o.workDirs)) {
-      done[chat.path] = end
-      continue
-    }
+  for (const source of sources) {
     let ok = true
-    for (const chunk of condense(entries)) {
+    for (const chunk of source.work ? [] : source.chunks) {
       const fullText = fullTextNotes(o.root, o.fullTextBudget)
       const payload = buildPayload({
         chunk,
@@ -132,7 +154,7 @@ export async function digest(o: DigestOptions): Promise<{ notes: number; skipped
       try {
         edits = parseEdits(await o.runner(RULES, payload))
       } catch (err) {
-        problems.push(`${basename(chat.path)}: ${(err as Error).message}`)
+        problems.push(`${source.label}: ${(err as Error).message}`)
         ok = false
         break
       }
@@ -145,10 +167,17 @@ export async function digest(o: DigestOptions): Promise<{ notes: number; skipped
       for (const p of result.applied) applied.add(p)
       skipped.push(...resolved.skipped, ...result.skipped)
     }
-    if (ok) done[chat.path] = end
+    if (ok) done[source.key] = source.end
+    else failed.push(source.key)
   }
 
-  if (o.dryRun) return { notes: 0, skipped: 0 }
+  const summary = {
+    skipped: skipped.length,
+    sources: sources.length,
+    failed,
+    keys: sources.map((s) => s.key),
+  }
+  if (o.dryRun) return { notes: 0, ...summary, skipped: 0 }
 
   const paths = [...applied]
   if (paths.length) {
@@ -167,7 +196,8 @@ export async function digest(o: DigestOptions): Promise<{ notes: number; skipped
     }
   }
 
-  for (const [path, end] of Object.entries(done)) state[path] = { size: end, digestedAt: today }
+  const state: DigestState = loadState(o.stateFile)
+  for (const [key, end] of Object.entries(done)) state[key] = { size: end, digestedAt: today }
   saveState(o.stateFile, state)
 
   const lines = [
@@ -175,5 +205,5 @@ export async function digest(o: DigestOptions): Promise<{ notes: number; skipped
     ...problems.map((p) => `failed ${p}`),
   ]
   if (lines.length) await o.notify(`garden: ${lines.join('\n')}`)
-  return { notes: paths.length, skipped: skipped.length }
+  return { notes: paths.length, ...summary }
 }

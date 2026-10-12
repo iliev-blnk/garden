@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { backfill } from './digest/backfill.ts'
 import { claudeRunner } from './digest/claude.ts'
 import { digest } from './digest/run.ts'
 import { STATE_FILE } from './digest/state.ts'
@@ -32,7 +33,8 @@ function loadEnvFile(file = join(homedir(), '.config/garden/env')) {
 
 const workDirs = () => (process.env.GARDEN_WORK_DIRS ?? '').split(':').filter(Boolean)
 /** Claude Code keeps a project's transcripts under its path with every non-alphanumeric turned into "-". */
-const ownProjectDir = () => join(PROJECTS, ROOT.replace(/[^a-zA-Z0-9]/g, '-'))
+const projectDirFor = (path: string) => join(PROJECTS, path.replace(/[^a-zA-Z0-9]/g, '-'))
+const ownProjectDir = () => projectDirFor(ROOT)
 
 async function main(argv: string[]): Promise<number> {
   loadEnvFile()
@@ -43,8 +45,9 @@ async function main(argv: string[]): Promise<number> {
       if (args[0] === '--staged') return report(await scanStaged(process.cwd(), denylist))
       return report(await scanPaths(expandPaths(args), denylist))
     }
-    case 'digest': {
-      const res = await digest({
+    case 'digest':
+    case 'backfill': {
+      const opts = {
         root: ROOT,
         projectsDir: PROJECTS,
         stateFile: STATE_FILE,
@@ -58,12 +61,26 @@ async function main(argv: string[]): Promise<number> {
         push: commitAndPush,
         notify,
         dryRun: args.includes('--dry-run'),
-      })
+      }
+      if (cmd === 'backfill') {
+        if (!process.env.GARDEN_WORK_MEMORY)
+          throw new Error('GARDEN_WORK_MEMORY is not set; refusing to backfill without it')
+        const limit = args.indexOf('--limit')
+        await backfill({
+          ...opts,
+          memoryDir: join(projectDirFor(homedir()), 'memory'),
+          workMemory: new RegExp(process.env.GARDEN_WORK_MEMORY, 'i'),
+          batch: 10,
+          maxChats: limit === -1 ? undefined : Number(args[limit + 1]),
+        })
+        return 0
+      }
+      const res = await digest(opts)
       process.stdout.write(`digest: ${res.notes} notes, ${res.skipped} skipped\n`)
       return 0
     }
     default:
-      process.stderr.write('usage: garden <scan|digest [--dry-run]>\n')
+      process.stderr.write('usage: garden <scan|digest [--dry-run]|backfill [--limit N] [--dry-run]>\n')
       return 2
   }
 }
