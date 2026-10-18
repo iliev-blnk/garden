@@ -71,7 +71,8 @@ async function main(argv: string[]): Promise<number> {
           denylist: loadDenylist(),
           runner: claudeRunner,
           build: async () => {
-            await promisify(execFile)('pnpm', ['run', 'build'], {
+            // The workspace borrows this checkout's node_modules; pnpm's dependency check would try to reinstall there.
+            await promisify(execFile)('pnpm', ['--config.verify-deps-before-run=false', 'run', 'build'], {
               cwd: WORKSPACE,
               maxBuffer: 64 * 1024 * 1024,
             })
