@@ -139,6 +139,23 @@ describe('digest', () => {
     expect(s.notifyFn).toHaveBeenCalledWith(expect.stringContaining('broken wikilink'))
   })
 
+  it('unlinks links to notes that do not exist, keeping ones a later chat creates', async () => {
+    const s = setup([
+      edits({
+        path: 'notes/hoodie.md',
+        content: note('hoodie', 'Pairs with [[pins]], not [[ghost-poster]].'),
+      }),
+      edits({ path: 'notes/pins.md', content: note('pins') }),
+    ])
+    writeChat(s.projects, 'a', [userLine('hoodie'), claudeLine('ok')])
+    writeChat(s.projects, 'b', [userLine('pins'), claudeLine('ok')])
+    const res = await digest(s.opts)
+    expect(res.notes).toBe(2)
+    expect(readFileSync(join(s.clone, 'notes/hoodie.md'), 'utf8')).toContain(
+      'Pairs with [[pins]], not ghost poster.',
+    )
+  })
+
   it('does not build or push when nothing applied', async () => {
     const s = setup([edits()])
     const chat = writeChat(s.projects, 'a', [userLine('hello')])

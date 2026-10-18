@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const LINK = /\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g
@@ -31,4 +31,24 @@ export function brokenLinks(root: string): { file: string; slug: string }[] {
       .filter((s) => !slugs.has(s))
       .map((slug) => ({ file: `notes/${n}`, slug }))
   })
+}
+
+/** Rewrites links to missing notes in `paths` as plain text (label, or the slug in words); returns the slugs unlinked. */
+export function unlinkBroken(root: string, paths: string[]): string[] {
+  const dir = join(root, 'notes')
+  const slugs = new Set(readdirSync(dir).map((n) => n.slice(0, -3)))
+  const gone: string[] = []
+  for (const p of paths.filter((p) => p.startsWith('notes/'))) {
+    const file = join(root, p)
+    if (!existsSync(file)) continue
+    const text = readFileSync(file, 'utf8')
+    // Inline code is matched first so links inside it are left alone.
+    const next = text.replace(/(`[^`\n]*`)|\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (all, code, slug, label) => {
+      if (code || slugs.has(slug.trim())) return all
+      gone.push(slug.trim())
+      return label?.trim() || slug.trim().replace(/-/g, ' ')
+    })
+    if (next !== text) writeFileSync(file, next)
+  }
+  return gone
 }

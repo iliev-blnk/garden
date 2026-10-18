@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import rehypeStringify from 'rehype-stringify'
@@ -6,7 +6,7 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import { describe, expect, it } from 'vitest'
-import { backlinks, brokenLinks } from '../lib/site/backlinks.ts'
+import { backlinks, brokenLinks, unlinkBroken } from '../lib/site/backlinks.ts'
 import { remarkNoHtml, remarkWikilinks } from '../lib/site/wikilinks.ts'
 
 const titles = new Map([
@@ -70,5 +70,17 @@ describe('brokenLinks', () => {
     writeFileSync(join(root, 'notes/a.md'), 'see [[b]] and [[ghost|boo]]')
     writeFileSync(join(root, 'notes/b.md'), 'back to [[a]], and `[[code]]` is fine')
     expect(brokenLinks(root)).toEqual([{ file: 'notes/a.md', slug: 'ghost' }])
+  })
+})
+
+describe('unlinkBroken', () => {
+  it('turns links to missing notes into plain text in the given files only', () => {
+    const root = mkdtempSync(join(tmpdir(), 'links-'))
+    mkdirSync(join(root, 'notes'))
+    writeFileSync(join(root, 'notes/a.md'), 'see [[b]], [[ghost-town]], [[ghost|boo]] and `[[code]]`')
+    writeFileSync(join(root, 'notes/b.md'), 'and [[ghost]]')
+    expect(unlinkBroken(root, ['notes/a.md'])).toEqual(['ghost-town', 'ghost'])
+    expect(readFileSync(join(root, 'notes/a.md'), 'utf8')).toBe('see [[b]], ghost town, boo and `[[code]]`')
+    expect(readFileSync(join(root, 'notes/b.md'), 'utf8')).toBe('and [[ghost]]')
   })
 })

@@ -6,6 +6,7 @@ import { type ApplyResult, applyEdits, noteIndex } from '../content/apply.ts'
 import { type Edit, parseNote, splitFrontmatter } from '../content/note.ts'
 import type { commitAndPush } from '../git.ts'
 import type { notify } from '../notify.ts'
+import { unlinkBroken } from '../site/backlinks.ts'
 import { localDate } from '../time.ts'
 import type { Runner } from './claude.ts'
 import { buildPayload, type DigestEdit, parseEdits, RULES } from './prompt.ts'
@@ -194,6 +195,8 @@ export async function processSources(o: DigestOptions, sources: Source[]): Promi
 
   const paths = [...applied]
   if (paths.length) {
+    // Claude sometimes links a note that was never made; that must not fail the whole build.
+    for (const slug of unlinkBroken(o.root, paths)) skipped.push({ path: `[[${slug}]]`, reason: 'unlinked' })
     try {
       await o.build()
     } catch (err) {
